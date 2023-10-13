@@ -186,7 +186,7 @@ est3_nn5 <- nonprob(
   outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
   data = cbop,
   svydesign = popyt_svy,
-  method_outcome = "glm"
+  method_outcome = "nn"
 )
 
 est3_nn3 <- nonprob(

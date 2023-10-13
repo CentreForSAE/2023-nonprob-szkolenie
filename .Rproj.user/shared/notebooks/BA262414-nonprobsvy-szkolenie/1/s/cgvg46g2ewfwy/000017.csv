@@ -1,0 +1,11 @@
+"0","## tu jest error
+est3_nn5 <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = ""glm""
+)
+"
+"2","Error in weighted.mean.default(y_rand_pred, w = weights_rand) : 
+  'x' and 'w' must have the same length
+"

@@ -1,0 +1,50 @@
+"0","summary(est2_logit_scad)
+"
+"1","
+Call:
+"
+"1",""
+"1","nonprob(data = cbop, selection = ~woj + sektor + pkd + klasa, 
+    target = ~jedna_zmiana, svydesign = popyt_svy, method_selection = ""logit"", 
+    control_selection = controlSel(nfolds = 5), control_inference = controlInf(vars_selection = TRUE), 
+    verbose = T)"
+"1",""
+"1","
+
+"
+"1","-------------------------
+"
+"1","Estimated population mean: "
+"1",""
+"1","0.6875"
+"1",""
+"1"," with overall std.err of: "
+"1",""
+"1","0.009891"
+"1",""
+"1","
+And std.err for nonprobability and probability samples being respectively:
+"
+"1",""
+"1","0.005792"
+"1",""
+"1"," and "
+"1",""
+"1","0.008018"
+"1",""
+"1","
+
+Based on: "
+"1",""
+"1","Inverse probability weighted"
+"1",""
+"1"," method"
+"1",""
+"1","
+
+"
+"1",""
+"1","95"
+"1",""
+"1","% Confidence inverval for popualtion mean:
+"

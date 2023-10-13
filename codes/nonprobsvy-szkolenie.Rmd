@@ -151,17 +151,42 @@ est2_logit_scad <- nonprob(
   control_selection = controlSel(nfolds = 5),
   verbose = T
 )
+
+est2_logit_scad$output
+```
+
+```{r}
+summary(est2_logit_scad)
 ```
 
 Masowa imputacja
 
+GLM (errors)
+
+```{r}
+est3_glm <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "glm"
+)
+
+est3_glm <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "glm",
+  family_outcome = "binomial"
+)
+
+```
 
 ```{r}
 est3_nn5 <- nonprob(
   outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
   data = cbop,
   svydesign = popyt_svy,
-  method_outcome = "nn"
+  method_outcome = "glm"
 )
 
 est3_nn3 <- nonprob(

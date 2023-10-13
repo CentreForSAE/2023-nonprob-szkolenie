@@ -1,0 +1,11 @@
+"0","est3_glm <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = ""glm"",
+  family_outcome = ""binomial""
+)
+"
+"2","Error in get(method, mode = ""function"", envir = parent.frame()) : 
+  object 'logit' of mode 'function' was not found
+"

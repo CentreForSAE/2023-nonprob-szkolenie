@@ -1,0 +1,1 @@
+"0","dane_szkolenie[, .(n1=uniqueN(sektor), n2=uniqueN(klasa), n3=uniqueN(pkd), n4=uniqueN(woj)), .(source)]"

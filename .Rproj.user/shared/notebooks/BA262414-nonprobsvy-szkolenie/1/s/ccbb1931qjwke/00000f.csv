@@ -1,0 +1,2 @@
+"0","cbop <- dane_szkolenie[source == ""cbop""]"
+"0","popyt <- dane_szkolenie[source == ""popyt""]"

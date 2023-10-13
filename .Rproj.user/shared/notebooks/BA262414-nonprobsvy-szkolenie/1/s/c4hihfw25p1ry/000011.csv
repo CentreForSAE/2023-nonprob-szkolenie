@@ -1,0 +1,4 @@
+"0","dane_szkolenie <- fread(""../data-raw/popyt-dane.csv"", colClasses = c(woj=""character""))"
+"0","dane_szkolenie[source == ""cbop"", waga := 1]"
+"0","dane_szkolenie[, jedna_zmiana:=as.numeric(jedna_zmiana)]"
+"0","head(dane_szkolenie)"

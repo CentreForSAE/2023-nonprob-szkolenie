@@ -1,0 +1,191 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Instalacja pakietów
+
+```{r}
+install.packages(c("data.table", "remotes"))
+remotes::install_github("ncn-foreigners/nonprobsvy")
+```
+
+Ładowanie pakietów
+
+```{r}
+library(data.table)
+library(nonprobsvy)
+library(survey)
+library(ggplot2)
+library(vcd)
+```
+
+```{r}
+dane_szkolenie <- fread("../data-raw/popyt-dane.csv", colClasses = c(woj="character"))
+dane_szkolenie[source == "cbop", waga := 1]
+dane_szkolenie[, jedna_zmiana:=as.numeric(jedna_zmiana)]
+head(dane_szkolenie)
+```
+Czy zgadza się liczba poziomów?
+
+```{r}
+dane_szkolenie[, .(n1=uniqueN(sektor), n2=uniqueN(klasa), n3=uniqueN(pkd), n4=uniqueN(woj)), .(source)]
+```
+
+Jakie są korelacje? - przynależność do źródła
+
+```{r}
+xtabs(waga~source + sektor, data = dane_szkolenie) |> assocstats()
+xtabs(waga~source + klasa, data = dane_szkolenie) |> assocstats()
+xtabs(waga~source + pkd, data = dane_szkolenie) |> assocstats()
+xtabs(waga~source + woj, data = dane_szkolenie) |> assocstats()
+```
+
+Jakie są korelacje? - oferty na jedną zmianę
+
+```{r}
+xtabs(waga~jedna_zmiana + sektor, data = dane_szkolenie) |> assocstats()
+xtabs(waga~jedna_zmiana + klasa, data = dane_szkolenie) |> assocstats()
+xtabs(waga~jedna_zmiana + pkd, data = dane_szkolenie) |> assocstats()
+xtabs(waga~jedna_zmiana + woj, data = dane_szkolenie) |> assocstats()
+```
+
+```{r}
+cbop <- dane_szkolenie[source == "cbop"]
+popyt <- dane_szkolenie[source == "popyt"]
+```
+
+Deklaracja obiektu `svydesign` z pakietu `survey`.
+
+```{r}
+popyt_svy <- svydesign(ids = ~1, 
+                       weights = ~waga, 
+                       strata = ~ klasa + pkd + woj, 
+                       data = popyt)
+
+svytotal(~klasa, popyt_svy)
+```
+
+Estymator IPW -- gdy dostępna jest tylko informacja na poziomie populacji
+
+```{r}
+est1_logit <- nonprob(
+  selection = ~ woj + sektor + pkd + klasa,
+  target = ~ jedna_zmiana,
+  pop_totals = c(
+    "(Intercept)" = sum(weights(popyt_svy)),
+    svytotal(~woj + sektor + pkd + klasa, popyt_svy)
+    ),
+  data = cbop,
+  method_selection = "logit"
+)
+
+est1_probit <- nonprob(
+  selection = ~ woj + sektor + pkd + klasa,
+  target = ~ jedna_zmiana,
+  pop_totals = c(
+    "(Intercept)" = sum(weights(popyt_svy)),
+    svytotal(~woj + sektor + pkd + klasa, popyt_svy)
+    ),
+  data = cbop,
+  method_selection = "probit"
+)
+
+est1_cloglog <- nonprob(
+  selection = ~ woj + sektor + pkd + klasa,
+  target = ~ jedna_zmiana,
+  pop_totals = c(
+    "(Intercept)" = sum(weights(popyt_svy)),
+    svytotal(~woj + sektor + pkd + klasa, popyt_svy)
+    ),
+  data = cbop,
+  method_selection = "cloglog"
+)
+
+rbind(est1_logit$confidence_interval,
+      est1_probit$confidence_interval,
+      est1_cloglog$confidence_interval)
+```
+
+
+Estymator IPW -- gdy dostępna jest próba losowa
+
+```{r}
+est2_logit <- nonprob(
+  selection = ~ woj + sektor + pkd + klasa,
+  target = ~ jedna_zmiana,
+  data = cbop,
+  svydesign = popyt_svy, 
+  method_selection = "logit"
+)
+
+est2_probit <- nonprob(
+  selection = ~ woj + sektor + pkd + klasa,
+  target = ~ jedna_zmiana,
+  data = cbop,
+  svydesign = popyt_svy, 
+  method_selection = "probit"
+)
+
+est2_cloglog <- nonprob(
+  selection = ~ woj + sektor + pkd + klasa,
+  target = ~ jedna_zmiana,
+  data = cbop,
+  svydesign = popyt_svy, 
+  method_selection = "cloglog"
+)
+
+rbind(est2_logit$confidence_interval,
+      est2_probit$confidence_interval,
+      est2_cloglog$confidence_interval)
+```
+
+```{r}
+est2_logit_scad <- nonprob(
+  selection = ~ woj + sektor + pkd + klasa,
+  target = ~ jedna_zmiana,
+  data = cbop,
+  svydesign = popyt_svy, 
+  method_selection = "logit",
+  control_inference = controlInf(vars_selection = TRUE),
+  control_selection = controlSel(nfolds = 5),
+  verbose = T
+)
+```
+
+Masowa imputacja
+
+
+```{r}
+est3_nn5 <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "nn"
+)
+
+est3_nn3 <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "nn",
+  control_outcome = controlOut(k = 3)
+)
+
+
+rbind(est3_nn3$confidence_interval,
+      est3_nn5$confidence_interval)
+```
+Podwójnie odporny estymator
+
+```{r}
+est4 <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  selection = ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "nn"
+)
+est4$confidence_interval
+```
+

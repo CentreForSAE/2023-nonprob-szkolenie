@@ -7,7 +7,7 @@ Instalacja pakietów
 
 ```{r}
 install.packages(c("data.table", "remotes"))
-remotes::install_github("ncn-foreigners/nonprobsvy")
+remotes::install_github("ncn-foreigners/nonprobsvy@dev")
 ```
 
 Ładowanie pakietów
@@ -118,7 +118,10 @@ est2_logit <- nonprob(
   svydesign = popyt_svy, 
   method_selection = "logit"
 )
+est2_logit$output
+```
 
+```{r}
 est2_probit <- nonprob(
   selection = ~ woj + sektor + pkd + klasa,
   target = ~ jedna_zmiana,
@@ -161,7 +164,6 @@ summary(est2_logit_scad)
 
 Masowa imputacja
 
-GLM (errors)
 
 ```{r}
 est3_glm <- nonprob(
@@ -171,7 +173,7 @@ est3_glm <- nonprob(
   method_outcome = "glm"
 )
 
-est3_glm <- nonprob(
+est3_glm_biom <- nonprob(
   outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
   data = cbop,
   svydesign = popyt_svy,
@@ -179,14 +181,23 @@ est3_glm <- nonprob(
   family_outcome = "binomial"
 )
 
+rbind(est3_glm$output,est3_glm_biom$output)
 ```
 
 ```{r}
+est3_pmm <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "pmm",
+  family_outcome = "binomial"
+)
+
 est3_nn5 <- nonprob(
   outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
   data = cbop,
   svydesign = popyt_svy,
-  method_outcome = "nn"
+  method_outcome = "nn",
 )
 
 est3_nn3 <- nonprob(
@@ -198,7 +209,8 @@ est3_nn3 <- nonprob(
 )
 
 
-rbind(est3_nn3$confidence_interval,
+rbind(est3_pmm$confidence_interval,
+      est3_nn3$confidence_interval,
       est3_nn5$confidence_interval)
 ```
 Podwójnie odporny estymator
@@ -209,8 +221,73 @@ est4 <- nonprob(
   selection = ~ woj + sektor + pkd + klasa,
   data = cbop,
   svydesign = popyt_svy,
-  method_outcome = "nn"
+  method_outcome = "glm",
+  family_outcome = "binomial"
 )
+
 est4$confidence_interval
 ```
+```{r}
+est4_boot <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  selection = ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "glm",
+  family_outcome = "binomial",
+  control_inference = controlInf(var_method = "bootstrap", rep_type = "subbootstrap", num_boot = 50),
+  verbose = T
+)
+```
+
+```{r}
+est4_sel <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  selection = ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "glm",
+  family_outcome = "binomial",
+  control_inference = controlInf(vars_selection = TRUE),
+  control_selection = controlSel(nfolds = 5),
+  control_outcome =  controlOut(nfolds = 5),
+  verbose = TRUE
+)
+
+```
+```{r}
+est4_sel_bias <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  selection = ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "glm",
+  family_outcome = "binomial",
+  control_inference = controlInf(vars_selection = TRUE, bias_correction = TRUE),
+  control_selection = controlSel(nfolds = 5),
+  control_outcome =  controlOut(nfolds = 5),
+  verbose = TRUE
+)
+
+```
+
+Porównanie wszystkich wyników
+
+```{r}
+wyniki <- rbind(
+  cbind(est2_logit$output,      est2_logit$confidence_interval),
+  cbind(est3_pmm$output,        est3_pmm$confidence_interval),
+  cbind(est3_nn5$output,        est3_nn5$confidence_interval),
+  cbind(est3_glm$output,        est3_glm$confidence_interval),
+  cbind(est4$output,            est4$confidence_interval),
+  cbind(est4_sel$output,        est4_sel$confidence_interval),
+  cbind(est4_sel_bias$output,   est4_sel_bias$confidence_interval)
+) |>
+  transform(est = c("IPW", "PMM", "NN", "MI", "DR", "DR (SCAD)", "DR (SCAD, MIN)"))
+
+ggplot(data = wyniki, aes(y = est, x = mean, xmin = lower_bound, xmax = upper_bound)) +
+  geom_point() +
+  geom_errorbar() 
+```
+
 

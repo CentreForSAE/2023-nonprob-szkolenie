@@ -5,7 +5,7 @@ output: html_notebook
 
 Instalacja pakietów
 
-```{r}
+```{r, eval = FALSE}
 install.packages(c("data.table", "remotes"))
 remotes::install_github("ncn-foreigners/nonprobsvy@dev")
 ```
@@ -20,10 +20,12 @@ library(ggplot2)
 library(vcd)
 ```
 
+Wczytujemy dane
 ```{r}
 dane_szkolenie <- fread("../data-raw/popyt-dane.csv", colClasses = c(woj="character"))
 dane_szkolenie[source == "cbop", waga := 1]
 dane_szkolenie[, jedna_zmiana:=as.numeric(jedna_zmiana)]
+dane_szkolenie[, r:= source == "cbop"]
 head(dane_szkolenie)
 ```
 Czy zgadza się liczba poziomów?
@@ -62,7 +64,6 @@ popyt_svy <- svydesign(ids = ~1,
                        weights = ~waga, 
                        strata = ~ klasa + pkd + woj, 
                        data = popyt)
-
 svytotal(~klasa, popyt_svy)
 ```
 
@@ -118,8 +119,25 @@ est2_logit <- nonprob(
   svydesign = popyt_svy, 
   method_selection = "logit"
 )
-est2_logit$output
+summary(est2_logit)
 ```
+
+Estymacja wariancji z wykorzystaniem metody bootstrap.
+
+```{r}
+est2_logit_boot <- nonprob(
+  selection = ~ woj + sektor + pkd + klasa,
+  target = ~ jedna_zmiana,
+  data = cbop,
+  svydesign = popyt_svy, 
+  method_selection = "logit",
+  control_inference = controlInf(var_method = "bootstrap", num_boot = 20),
+  verbose = TRUE
+)
+est2_logit_boot
+```
+
+To samo tylko używamy innej funkcji linkującej (probit, cloglog)
 
 ```{r}
 est2_probit <- nonprob(
@@ -142,6 +160,7 @@ rbind(est2_logit$confidence_interval,
       est2_probit$confidence_interval,
       est2_cloglog$confidence_interval)
 ```
+Dobór zmiennych do modelu, uwaga trwa długo dlatego zmieniam parametry w argumencie `controlSel(nfolds = 5, nlambda = 10)` żeby poszło to sprawnie.
 
 ```{r}
 est2_logit_scad <- nonprob(
@@ -151,7 +170,7 @@ est2_logit_scad <- nonprob(
   svydesign = popyt_svy, 
   method_selection = "logit",
   control_inference = controlInf(vars_selection = TRUE),
-  control_selection = controlSel(nfolds = 5),
+  control_selection = controlSel(nfolds = 5, nlambda = 10),
   verbose = T
 )
 
@@ -163,7 +182,6 @@ summary(est2_logit_scad)
 ```
 
 Masowa imputacja
-
 
 ```{r}
 est3_glm <- nonprob(
@@ -184,13 +202,31 @@ est3_glm_biom <- nonprob(
 rbind(est3_glm$output,est3_glm_biom$output)
 ```
 
+Estymacja wariancji z wykorzystaniem metody bootstrap
+
+```{r}
+est3_glm_biom_boot <- nonprob(
+  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
+  data = cbop,
+  svydesign = popyt_svy,
+  method_outcome = "glm",
+  family_outcome = "binomial",
+  control_inference = controlInf(var_method = "bootstrap", num_boot = 20)
+)
+
+summary(est3_glm_biom_boot)
+```
+
+Masowa imputacja z wykorzystaniem metod najbliższego sąsiada (PMM = predictive mean matching, NN = nearest neighbours).
+
 ```{r}
 est3_pmm <- nonprob(
   outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
   data = cbop,
   svydesign = popyt_svy,
   method_outcome = "pmm",
-  family_outcome = "binomial"
+  family_outcome = "binomial",
+  control_inference = controlInf(var_method = "bootstrap", num_boot = 20)
 )
 
 est3_nn5 <- nonprob(
@@ -198,6 +234,7 @@ est3_nn5 <- nonprob(
   data = cbop,
   svydesign = popyt_svy,
   method_outcome = "nn",
+  control_inference = controlInf(var_method = "bootstrap", num_boot = 20)
 )
 
 est3_nn3 <- nonprob(
@@ -213,7 +250,8 @@ rbind(est3_pmm$confidence_interval,
       est3_nn3$confidence_interval,
       est3_nn5$confidence_interval)
 ```
-Podwójnie odporny estymator
+
+Podwójnie odporne estymatory
 
 ```{r}
 est4 <- nonprob(
@@ -235,11 +273,14 @@ est4_boot <- nonprob(
   svydesign = popyt_svy,
   method_outcome = "glm",
   family_outcome = "binomial",
-  control_inference = controlInf(var_method = "bootstrap", rep_type = "subbootstrap", num_boot = 50),
-  verbose = T
+  control_inference = controlInf(var_method = "bootstrap",
+                                 num_boot = 20)
 )
+
+est4_boot$confidence_interval
 ```
 
+DR z doborem zmiennych
 ```{r}
 est4_sel <- nonprob(
   outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
@@ -249,23 +290,8 @@ est4_sel <- nonprob(
   method_outcome = "glm",
   family_outcome = "binomial",
   control_inference = controlInf(vars_selection = TRUE),
-  control_selection = controlSel(nfolds = 5),
-  control_outcome =  controlOut(nfolds = 5),
-  verbose = TRUE
-)
-
-```
-```{r}
-est4_sel_bias <- nonprob(
-  outcome = jedna_zmiana ~ woj + sektor + pkd + klasa,
-  selection = ~ woj + sektor + pkd + klasa,
-  data = cbop,
-  svydesign = popyt_svy,
-  method_outcome = "glm",
-  family_outcome = "binomial",
-  control_inference = controlInf(vars_selection = TRUE, bias_correction = TRUE),
-  control_selection = controlSel(nfolds = 5),
-  control_outcome =  controlOut(nfolds = 5),
+  control_selection = controlSel(nfolds = 5, nlambda = 10),
+  control_outcome =  controlOut(nfolds = 5, nlambda = 10),
   verbose = TRUE
 )
 
@@ -280,13 +306,13 @@ wyniki <- rbind(
   cbind(est3_nn5$output,        est3_nn5$confidence_interval),
   cbind(est3_glm$output,        est3_glm$confidence_interval),
   cbind(est4$output,            est4$confidence_interval),
-  cbind(est4_sel$output,        est4_sel$confidence_interval),
-  cbind(est4_sel_bias$output,   est4_sel_bias$confidence_interval)
+  cbind(est4_sel$output,        est4_sel$confidence_interval)
 ) |>
-  transform(est = c("IPW", "PMM", "NN", "MI", "DR", "DR (SCAD)", "DR (SCAD, MIN)"))
+  transform(est = c("IPW", "PMM", "NN", "MI", "DR", "DR (SCAD)"))
 
 ggplot(data = wyniki, aes(y = est, x = mean, xmin = lower_bound, xmax = upper_bound)) +
   geom_point() +
+  geom_vline(xintercept = mean(cbop$jedna_zmiana), linetype = "dotted", color = "red") + 
   geom_errorbar() 
 ```
 
